@@ -75,7 +75,9 @@ func TestStreamerRetrieveRequest(t *testing.T) {
 }
 
 func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
-	tester, streamer, _, teardown, err := newStreamerTester(t, nil)
+	tester, streamer, _, teardown, err := newStreamerTester(t, &RegistryOptions{
+		DoServeRetrieve: true,
+	})
 	defer teardown()
 	if err != nil {
 		t.Fatal(err)
@@ -88,7 +90,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 	peer := streamer.getPeer(node.ID())
 
 	peer.handleSubscribeMsg(context.TODO(), &SubscribeMsg{
-		Stream:   NewStream(swarmChunkServerStreamName, "", false),
+		Stream:   NewStream(swarmChunkServerStreamName, "", true),
 		History:  nil,
 		Priority: Top,
 	})
@@ -127,7 +129,9 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 // upstream request server receives a retrieve Request and responds with
 // offered hashes or delivery if skipHash is set to true
 func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
-	tester, streamer, localStore, teardown, err := newStreamerTester(t, nil)
+	tester, streamer, localStore, teardown, err := newStreamerTester(t, &RegistryOptions{
+		DoServeRetrieve: true,
+	})
 	defer teardown()
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +140,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 	node := tester.Nodes[0]
 	peer := streamer.getPeer(node.ID())
 
-	stream := NewStream(swarmChunkServerStreamName, "", false)
+	stream := NewStream(swarmChunkServerStreamName, "", true)
 
 	peer.handleSubscribeMsg(context.TODO(), &SubscribeMsg{
 		Stream:   stream,
@@ -221,7 +225,9 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 }
 
 func TestStreamerDownstreamChunkDeliveryMsgExchange(t *testing.T) {
-	tester, streamer, localStore, teardown, err := newStreamerTester(t, nil)
+	tester, streamer, localStore, teardown, err := newStreamerTester(t, &RegistryOptions{
+		DoServeRetrieve: true,
+	})
 	defer teardown()
 	if err != nil {
 		t.Fatal(err)
@@ -336,7 +342,8 @@ func testDeliveryFromNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck
 			netStore.NewNetFetcherFunc = network.NewFetcherFactory(delivery.RequestFromPeers, true).New
 
 			r := NewRegistry(addr.ID(), delivery, netStore, state.NewInmemoryStore(), &RegistryOptions{
-				SkipCheck: skipCheck,
+				SkipCheck:       skipCheck,
+				DoServeRetrieve: true,
 			})
 			bucket.Store(bucketKeyRegistry, r)
 
@@ -409,7 +416,7 @@ func testDeliveryFromNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck
 				return fmt.Errorf("No registry")
 			}
 			registry := item.(*Registry)
-			err = registry.Subscribe(sid, NewStream(swarmChunkServerStreamName, "", false), NewRange(0, 0), Top)
+			err = registry.Subscribe(sid, NewStream(swarmChunkServerStreamName, "", true), nil, Top)
 			if err != nil {
 				return err
 			}

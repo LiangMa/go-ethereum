@@ -96,6 +96,11 @@ func (s *SwarmChunkServer) processDeliveries() {
 	}
 }
 
+// SessionIndex returns zero in all cases for SwarmChunkServer.
+func (s *SwarmChunkServer) SessionIndex() (uint64, error) {
+	return 0, nil
+}
+
 // SetNextBatch
 func (s *SwarmChunkServer) SetNextBatch(_, _ uint64) (hashes []byte, from uint64, to uint64, proof *HandoverProof, err error) {
 	select {
@@ -141,7 +146,7 @@ func (d *Delivery) handleRetrieveRequestMsg(ctx context.Context, sp *Peer, req *
 		"retrieve.request")
 	defer osp.Finish()
 
-	s, err := sp.getServer(NewStream(swarmChunkServerStreamName, "", false))
+	s, err := sp.getServer(NewStream(swarmChunkServerStreamName, "", true))
 	if err != nil {
 		return err
 	}
@@ -168,7 +173,8 @@ func (d *Delivery) handleRetrieveRequestMsg(ctx context.Context, sp *Peer, req *
 			return
 		}
 		if req.SkipCheck {
-			err = sp.Deliver(ctx, chunk, s.priority)
+			syncing := false
+			err = sp.Deliver(ctx, chunk, s.priority, syncing)
 			if err != nil {
 				log.Warn("ERROR in handleRetrieveRequestMsg", "err", err)
 			}
@@ -184,11 +190,21 @@ func (d *Delivery) handleRetrieveRequestMsg(ctx context.Context, sp *Peer, req *
 	return nil
 }
 
+//Chunk delivery always uses the same message type....
 type ChunkDeliveryMsg struct {
 	Addr  storage.Address
 	SData []byte // the stored chunk Data (incl size)
 	peer  *Peer  // set in handleChunkDeliveryMsg
 }
+
+//...but swap accounting needs to disambiguate if it is a delivery for syncing or for retrieval
+//as it decides based on message type if it needs to account for this message or not
+
+//defines a chunk delivery for retrieval (with accounting)
+type ChunkDeliveryMsgRetrieval ChunkDeliveryMsg
+
+//defines a chunk delivery for syncing (without accounting)
+type ChunkDeliveryMsgSyncing ChunkDeliveryMsg
 
 // TODO: Fix context SNAFU
 func (d *Delivery) handleChunkDeliveryMsg(ctx context.Context, sp *Peer, req *ChunkDeliveryMsg) error {
